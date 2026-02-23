@@ -129,12 +129,12 @@ async function sendHelpMessage(interaction, client, page = 0, selectedCategory =
     const row2 = new ActionRowBuilder()
         .addComponents(prevButton, homeButton, nextButton);
 
-    // If this is from a select menu update, reply with update
-    if (interaction.isUpdateMessage()) {
+    // If this is from a message component update, reply with update
+    if (interaction.isMessageComponent() && interaction.message && interaction.message.interaction) {
         await interaction.update({ embeds: [embed], components: [row1, row2] });
     } else {
         // Send new message
-        await interaction.reply({ embeds: [embed], components: [row1, row2], ephemeral: true });
+        await interaction.reply({ embeds: [embed], components: [row1, row2], flags: 64 });
     }
 
     // Create message collector for button interactions
@@ -164,8 +164,9 @@ function createCollector(client, message, initialPage, initialCategory) {
     let currentCategory = initialCategory || categoryKeys[initialPage];
 
     collector.on('collect', async (btnInteraction) => {
-        if (!btnInteraction.user.id === btnInteraction.user.id) {
-            await btnInteraction.reply({ content: 'This menu is not for you!', ephemeral: true });
+        // Only allow the original user to interact
+        if (btnInteraction.user.id !== interaction.user.id) {
+            await btnInteraction.reply({ content: 'This menu is not for you!', flags: 64 });
             return;
         }
 
@@ -192,8 +193,9 @@ function createCollector(client, message, initialPage, initialCategory) {
     });
 
     selectCollector.on('collect', async (selectInteraction) => {
-        if (!selectInteraction.user.id === selectInteraction.user.id) {
-            await selectInteraction.reply({ content: 'This menu is not for you!', ephemeral: true });
+        // Only allow the original user to interact
+        if (selectInteraction.user.id !== interaction.user.id) {
+            await selectInteraction.reply({ content: 'This menu is not for you!', flags: 64 });
             return;
         }
 
