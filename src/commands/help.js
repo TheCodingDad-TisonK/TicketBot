@@ -4,7 +4,8 @@ const {
     ButtonBuilder, 
     ButtonStyle, 
     StringSelectMenuBuilder,
-    ComponentType 
+    ComponentType,
+    SlashCommandBuilder 
 } = require('discord.js');
 
 const helpCategories = {
@@ -260,6 +261,9 @@ async function updateHelpFromSelect(interaction, client, page, category) {
 }
 
 module.exports = {
+    data: new SlashCommandBuilder()
+        .setName('help')
+        .setDescription('Display help information about commands'),
     name: 'help',
     description: 'Display help information about commands',
     callback: async (interaction, client) => {
