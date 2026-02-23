@@ -135,7 +135,7 @@ async function execute(interaction, client) {
     const embed = buildHelpEmbed(page);
     const components = buildComponents(page);
 
-    await interaction.reply({ embeds: embed, components: components, flags: 64 });
+    await interaction.reply({ embeds: [embed], components: components, flags: 64 });
 }
 
 // Export both the slash command data and an interaction handler
@@ -157,7 +157,7 @@ module.exports = {
             const embed = buildHelpEmbed(page, category);
             const components = buildComponents(page, category);
             
-            await interaction.update({ embeds: embed, components: components });
+            await interaction.update({ embeds: [embed], components: components });
         } 
         else if (customId.startsWith('help_prev_')) {
             // Previous button
@@ -167,7 +167,7 @@ module.exports = {
             const embed = buildHelpEmbed(newPage);
             const components = buildComponents(newPage);
             
-            await interaction.update({ embeds: embed, components: components });
+            await interaction.update({ embeds: [embed], components: components });
         } 
         else if (customId.startsWith('help_next_')) {
             // Next button
@@ -177,14 +177,14 @@ module.exports = {
             const embed = buildHelpEmbed(newPage);
             const components = buildComponents(newPage);
             
-            await interaction.update({ embeds: embed, components: components });
+            await interaction.update({ embeds: [embed], components: components });
         } 
         else if (customId.startsWith('help_home_')) {
             // Home button
             const embed = buildHelpEmbed(0);
             const components = buildComponents(0);
             
-            await interaction.update({ embeds: embed, components: components });
+            await interaction.update({ embeds: [embed], components: components });
         }
     }
 };
