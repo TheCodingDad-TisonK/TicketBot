@@ -155,9 +155,12 @@ async function sendHelpMessage(interaction, client, page = 0, selectedCategory =
 }
 
 function createCollector(client, message, initialPage, initialCategory) {
-    const collector = message.createMessageComponentCollector({
+    const channel = message.channel;
+    
+    const collector = channel.createMessageComponentCollector({
         componentType: ComponentType.Button,
-        time: 120000 // 2 minutes
+        time: 120000, // 2 minutes
+        filter: (i) => i.message.id === message.id
     });
 
     let currentPage = initialPage;
@@ -187,9 +190,10 @@ function createCollector(client, message, initialPage, initialCategory) {
     });
 
     // Handle select menu
-    const selectCollector = message.createMessageComponentCollector({
+    const selectCollector = channel.createMessageComponentCollector({
         componentType: ComponentType.StringSelect,
-        time: 120000
+        time: 120000,
+        filter: (i) => i.message.id === message.id
     });
 
     selectCollector.on('collect', async (selectInteraction) => {
