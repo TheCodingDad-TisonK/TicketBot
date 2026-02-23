@@ -15,12 +15,14 @@ const ticketManage      = require('./commands/ticket-manage');
 const adminCmds         = require('./commands/admin');
 const modPanelCmds      = require('./commands/mod-panel');
 const ticketOpen        = require('./commands/ticket-open');
+const helpCmd          = require('./commands/help');
 
 // ── Build command map ─────────────────────────
 const commands = new Map();
 
 const allCmds = [
   { name: 'ticket',      ...ticketOpen },
+  { name: 'help',        ...helpCmd },
   ...Object.entries(ticketManage).map(([k, v]) => ({ name: v.data.name, ...v })),
   ...Object.entries(adminCmds).map(([k, v]) => ({ name: v.data.name, ...v })),
   ...Object.entries(modPanelCmds).map(([k, v]) => ({ name: v.data.name, ...v })),
@@ -49,7 +51,7 @@ client.once('ready', () => {
   console.log(`   Commands: ${commands.size}`);
   console.log(`   Guilds  : ${client.guilds.cache.size}\n`);
 
-  client.user.setActivity('🎫 FS25 Mod Support', { type: ActivityType.Watching });
+  client.user.setActivity('all the tickets 🎫', { type: ActivityType.Watching });
 
   // Notify server owners/admins to configure the bot
   for (const [guildId, guild] of client.guilds.cache) {
