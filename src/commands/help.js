@@ -4,7 +4,6 @@ const {
     ButtonBuilder, 
     ButtonStyle, 
     StringSelectMenuBuilder,
-    ComponentType,
     SlashCommandBuilder 
 } = require('discord.js');
 
@@ -71,147 +70,9 @@ const helpCategories = {
 
 const categoryKeys = Object.keys(helpCategories);
 
-async function sendHelpMessage(interaction, client, page = 0, selectedCategory = null) {
-    const totalPages = categoryKeys.length;
-    
-    const currentCategory = selectedCategory || categoryKeys[page];
+function buildHelpEmbed(page = 0, category = null) {
+    const currentCategory = category || categoryKeys[page];
     const categoryData = helpCategories[currentCategory];
-
-    const embed = new EmbedBuilder()
-        .setTitle(`${categoryData.emoji} ${categoryData.name}`)
-        .setDescription(categoryData.description)
-        .setColor(0x6C5CE7)
-        .setFooter({ text: `Page ${page + 1}/${totalPages} • Use the dropdown to browse categories` })
-        .setTimestamp();
-
-    // Add commands to embed
-    categoryData.commands.forEach(cmd => {
-        embed.addFields([
-            { name: cmd.name, value: cmd.description, inline: false }
-        ]);
-    });
-
-    // Create dropdown menu
-    const selectMenu = new StringSelectMenuBuilder()
-        .setCustomId('help_category_select')
-        .setPlaceholder('Select a category')
-        .addOptions(
-            categoryKeys.map((key, index) => ({
-                label: helpCategories[key].name,
-                value: key,
-                description: helpCategories[key].description.substring(0, 50),
-                emoji: helpCategories[key].emoji,
-                default: key === currentCategory
-            }))
-        );
-
-    // Create navigation buttons
-    const prevButton = new ButtonBuilder()
-        .setCustomId('help_prev')
-        .setLabel('◀ Previous')
-        .setStyle(ButtonStyle.Secondary)
-        .setDisabled(page === 0);
-
-    const nextButton = new ButtonBuilder()
-        .setCustomId('help_next')
-        .setLabel('Next ▶')
-        .setStyle(ButtonStyle.Secondary)
-        .setDisabled(page === totalPages - 1);
-
-    const homeButton = new ButtonBuilder()
-        .setCustomId('help_home')
-        .setLabel('🏠 Home')
-        .setStyle(ButtonStyle.Primary);
-
-    const row1 = new ActionRowBuilder()
-        .addComponents(selectMenu);
-
-    const row2 = new ActionRowBuilder()
-        .addComponents(prevButton, homeButton, nextButton);
-
-    // If this is from a message component update, reply with update
-    if (interaction.isMessageComponent() && interaction.message && interaction.message.interaction) {
-        await interaction.update({ embeds: [embed], components: [row1, row2] });
-    } else {
-        // Send new message
-        await interaction.reply({ embeds: [embed], components: [row1, row2], flags: 64 });
-    }
-
-    // Create message collector for button interactions
-    const message = interaction.channel?.messages.cache.last ?? 
-                   (interaction.message && client.channels.cache.get(interaction.message.channelId)?.messages.cache.get(interaction.message.id));
-
-    if (!message) {
-        // Try to fetch the reply message
-        try {
-            const reply = await interaction.fetchReply();
-            return createCollector(client, reply, page, selectedCategory);
-        } catch (e) {
-            return;
-        }
-    }
-
-    createCollector(client, message, page, selectedCategory);
-}
-
-function createCollector(client, message, initialPage, initialCategory) {
-    const channel = message.channel;
-    
-    const collector = channel.createMessageComponentCollector({
-        componentType: ComponentType.Button,
-        time: 120000, // 2 minutes
-        filter: (i) => i.message.id === message.id
-    });
-
-    let currentPage = initialPage;
-    let currentCategory = initialCategory || categoryKeys[initialPage];
-
-    collector.on('collect', async (btnInteraction) => {
-        // Only allow the original user to interact
-        if (btnInteraction.user.id !== interaction.user.id) {
-            await btnInteraction.reply({ content: 'This menu is not for you!', flags: 64 });
-            return;
-        }
-
-        await btnInteraction.deferUpdate();
-
-        if (btnInteraction.customId === 'help_next') {
-            currentPage = (currentPage + 1) % categoryKeys.length;
-            currentCategory = categoryKeys[currentPage];
-        } else if (btnInteraction.customId === 'help_prev') {
-            currentPage = (currentPage - 1 + categoryKeys.length) % categoryKeys.length;
-            currentCategory = categoryKeys[currentPage];
-        } else if (btnInteraction.customId === 'help_home') {
-            currentPage = 0;
-            currentCategory = categoryKeys[0];
-        }
-
-        await updateHelpMessage(btnInteraction, client, currentPage, currentCategory);
-    });
-
-    // Handle select menu
-    const selectCollector = channel.createMessageComponentCollector({
-        componentType: ComponentType.StringSelect,
-        time: 120000,
-        filter: (i) => i.message.id === message.id
-    });
-
-    selectCollector.on('collect', async (selectInteraction) => {
-        // Only allow the original user to interact
-        if (selectInteraction.user.id !== interaction.user.id) {
-            await selectInteraction.reply({ content: 'This menu is not for you!', flags: 64 });
-            return;
-        }
-
-        currentCategory = selectInteraction.values[0];
-        currentPage = categoryKeys.indexOf(currentCategory);
-
-        await updateHelpFromSelect(selectInteraction, client, currentPage, currentCategory);
-    });
-}
-
-async function updateHelpMessage(interaction, client, page, category) {
-    const categoryData = helpCategories[category];
 
     const embed = new EmbedBuilder()
         .setTitle(`${categoryData.emoji} ${categoryData.name}`)
@@ -226,6 +87,12 @@ async function updateHelpMessage(interaction, client, page, category) {
         ]);
     });
 
+    return embed;
+}
+
+function buildComponents(page = 0, category = null) {
+    const currentCategory = category || categoryKeys[page];
+    
     const selectMenu = new StringSelectMenuBuilder()
         .setCustomId('help_category_select')
         .setPlaceholder('Select a category')
@@ -235,42 +102,89 @@ async function updateHelpMessage(interaction, client, page, category) {
                 value: key,
                 description: helpCategories[key].description.substring(0, 50),
                 emoji: helpCategories[key].emoji,
-                default: key === category
+                default: key === currentCategory
             }))
         );
 
     const prevButton = new ButtonBuilder()
-        .setCustomId('help_prev')
+        .setCustomId(`help_prev_${page}`)
         .setLabel('◀ Previous')
         .setStyle(ButtonStyle.Secondary)
         .setDisabled(page === 0);
 
     const nextButton = new ButtonBuilder()
-        .setCustomId('help_next')
+        .setCustomId(`help_next_${page}`)
         .setLabel('Next ▶')
         .setStyle(ButtonStyle.Secondary)
         .setDisabled(page === categoryKeys.length - 1);
 
     const homeButton = new ButtonBuilder()
-        .setCustomId('help_home')
+        .setCustomId('help_home_0')
         .setLabel('🏠 Home')
         .setStyle(ButtonStyle.Primary);
 
     const row1 = new ActionRowBuilder().addComponents(selectMenu);
     const row2 = new ActionRowBuilder().addComponents(prevButton, homeButton, nextButton);
 
-    await interaction.editReply({ embeds: [embed], components: [row1, row2] });
+    return [row1, row2];
 }
 
-async function updateHelpFromSelect(interaction, client, page, category) {
-    await updateHelpMessage(interaction, client, page, category);
+async function execute(interaction, client) {
+    const page = 0;
+    
+    const embed = buildHelpEmbed(page);
+    const components = buildComponents(page);
+
+    await interaction.reply({ embeds: embed, components: components, flags: 64 });
 }
 
+// Export both the slash command data and an interaction handler
 module.exports = {
     data: new SlashCommandBuilder()
         .setName('help')
         .setDescription('Display help information about commands'),
-    execute: async (interaction, client) => {
-        await sendHelpMessage(interaction, client, 0, null);
+    execute,
+    
+    // Handle button and select menu interactions
+    handleComponent: async (interaction, client) => {
+        const customId = interaction.customId;
+        
+        if (customId.startsWith('help_category_select')) {
+            // Dropdown menu was used
+            const category = interaction.values[0];
+            const page = categoryKeys.indexOf(category);
+            
+            const embed = buildHelpEmbed(page, category);
+            const components = buildComponents(page, category);
+            
+            await interaction.update({ embeds: embed, components: components });
+        } 
+        else if (customId.startsWith('help_prev_')) {
+            // Previous button
+            const currentPage = parseInt(customId.replace('help_prev_', ''));
+            const newPage = Math.max(0, currentPage - 1);
+            
+            const embed = buildHelpEmbed(newPage);
+            const components = buildComponents(newPage);
+            
+            await interaction.update({ embeds: embed, components: components });
+        } 
+        else if (customId.startsWith('help_next_')) {
+            // Next button
+            const currentPage = parseInt(customId.replace('help_next_', ''));
+            const newPage = Math.min(categoryKeys.length - 1, currentPage + 1);
+            
+            const embed = buildHelpEmbed(newPage);
+            const components = buildComponents(newPage);
+            
+            await interaction.update({ embeds: embed, components: components });
+        } 
+        else if (customId.startsWith('help_home_')) {
+            // Home button
+            const embed = buildHelpEmbed(0);
+            const components = buildComponents(0);
+            
+            await interaction.update({ embeds: embed, components: components });
+        }
     }
 };
