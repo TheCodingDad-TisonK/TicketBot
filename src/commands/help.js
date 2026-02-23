@@ -264,9 +264,7 @@ module.exports = {
     data: new SlashCommandBuilder()
         .setName('help')
         .setDescription('Display help information about commands'),
-    name: 'help',
-    description: 'Display help information about commands',
-    callback: async (interaction, client) => {
+    execute: async (interaction, client) => {
         await sendHelpMessage(interaction, client, 0, null);
     }
 };
