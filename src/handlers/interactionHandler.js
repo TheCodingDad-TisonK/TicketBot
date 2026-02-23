@@ -18,6 +18,9 @@ const {
   COLORS, ticketPanel, humanDuration,
 } = require('../utils/embeds');
 
+// Import help command for component handling
+const helpCmd = require('../commands/help');
+
 module.exports = async function handleInteraction(interaction, client) {
   // ── Modal submits ─────────────────────────────
   if (interaction.isModalSubmit()) {
@@ -26,11 +29,19 @@ module.exports = async function handleInteraction(interaction, client) {
 
   // ── Button interactions ───────────────────────
   if (interaction.isButton()) {
+    // Check if it's a help command button
+    if (interaction.customId.startsWith('help_')) {
+      return helpCmd.handleComponent(interaction, client);
+    }
     return handleButton(interaction, client);
   }
 
   // ── String select menus ───────────────────────
   if (interaction.isStringSelectMenu()) {
+    // Check if it's a help command select menu
+    if (interaction.customId.startsWith('help_')) {
+      return helpCmd.handleComponent(interaction, client);
+    }
     return handleSelect(interaction, client);
   }
 };

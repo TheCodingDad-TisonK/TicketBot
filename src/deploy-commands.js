@@ -8,9 +8,11 @@ const ticketManage = require('./commands/ticket-manage');
 const adminCmds    = require('./commands/admin');
 const modPanelCmds = require('./commands/mod-panel');
 const ticketOpen   = require('./commands/ticket-open');
+const helpCmd      = require('./commands/help');
 
 const commands = [
   ticketOpen.data.toJSON(),
+  helpCmd.data.toJSON(),
 
   // Ticket management
   ...Object.values(ticketManage).map(c => c.data.toJSON()),
