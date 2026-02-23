@@ -3,7 +3,6 @@ const {
     ActionRowBuilder, 
     ButtonBuilder, 
     ButtonStyle, 
-    StringSelectMenuBuilder,
     SlashCommandBuilder 
 } = require('discord.js');
 
@@ -12,6 +11,7 @@ const helpCategories = {
         name: 'User Commands',
         emoji: '👤',
         description: 'Commands available to all server members',
+        color: 0x00D26A,
         commands: [
             { name: '/ticket [category] [dm]', description: 'Open a support ticket' },
         ]
@@ -20,6 +20,7 @@ const helpCategories = {
         name: 'Staff Commands',
         emoji: '🛡️',
         description: 'Commands available to staff members',
+        color: 0xF39C12,
         commands: [
             { name: '/close [reason]', description: 'Close the current ticket' },
             { name: '/reopen', description: 'Reopen a closed ticket' },
@@ -43,6 +44,7 @@ const helpCategories = {
         name: 'Admin Commands',
         emoji: '⚙️',
         description: 'Commands available to administrators',
+        color: 0xE74C3C,
         commands: [
             { name: '/panel [channel]', description: 'Post ticket panel' },
             { name: '/delete [reason]', description: 'Delete a ticket' },
@@ -60,6 +62,7 @@ const helpCategories = {
         name: 'Bot Information',
         emoji: 'ℹ️',
         description: 'General bot information and links',
+        color: 0x3498DB,
         commands: [
             { name: 'Ticket Categories', description: 'Bug Report, Feature Request, General Support, Collaboration, Mod Testing, Staff Report' },
             { name: 'Priority Levels', description: '🟢 Low, 🔵 Normal, 🟡 High, 🔴 Critical' },
@@ -70,70 +73,98 @@ const helpCategories = {
 
 const categoryKeys = Object.keys(helpCategories);
 
-function buildHelpEmbed(page = 0, category = null) {
-    const currentCategory = category || categoryKeys[page];
-    const categoryData = helpCategories[currentCategory];
-
+function buildMainMenuEmbed() {
     const embed = new EmbedBuilder()
-        .setTitle(`${categoryData.emoji} ${categoryData.name}`)
-        .setDescription(categoryData.description)
+        .setTitle('🎫 TicketBot Help')
+        .setDescription('Welcome to the TicketBot command overview! Select a category below to view its commands.')
         .setColor(0x6C5CE7)
-        .setFooter({ text: `Page ${page + 1}/${categoryKeys.length} • Use the dropdown to browse categories` })
+        .setFooter({ text: 'TicketBot • Use buttons to navigate' })
         .setTimestamp();
 
-    categoryData.commands.forEach(cmd => {
-        embed.addFields([
-            { name: cmd.name, value: cmd.description, inline: false }
-        ]);
-    });
+    // Add category overview
+    const categoryOverview = categoryKeys.map(key => {
+        const cat = helpCategories[key];
+        return `\`${cat.emoji}\` **${cat.name}**\n> ${cat.description}`;
+    }).join('\n\n');
+
+    embed.addFields([
+        { name: '📚 Available Categories', value: categoryOverview, inline: false }
+    ]);
 
     return embed;
 }
 
-function buildComponents(page = 0, category = null) {
-    const currentCategory = category || categoryKeys[page];
+function buildCategoryEmbed(categoryKey) {
+    const categoryData = helpCategories[categoryKey];
     
-    const selectMenu = new StringSelectMenuBuilder()
-        .setCustomId('help_category_select')
-        .setPlaceholder('Select a category')
-        .addOptions(
-            categoryKeys.map((key, index) => ({
-                label: helpCategories[key].name,
-                value: key,
-                description: helpCategories[key].description.substring(0, 50),
-                emoji: helpCategories[key].emoji,
-                default: key === currentCategory
-            }))
-        );
+    // Build commands list with better formatting
+    const commandsList = categoryData.commands.map(cmd => {
+        // Wrap command name in code blocks for emphasis
+        return `**\`${cmd.name}\`**\n   ↳ ${cmd.description}`;
+    }).join('\n\n');
 
-    const prevButton = new ButtonBuilder()
-        .setCustomId(`help_prev_${page}`)
-        .setLabel('◀ Previous')
-        .setStyle(ButtonStyle.Secondary)
-        .setDisabled(page === 0);
+    const embed = new EmbedBuilder()
+        .setTitle(`${categoryData.emoji} ${categoryData.name}`)
+        .setDescription(`*${categoryData.description}*\n\n${commandsList}`)
+        .setColor(categoryData.color)
+        .setFooter({ text: 'TicketBot • Use buttons to navigate between categories' })
+        .setTimestamp();
 
-    const nextButton = new ButtonBuilder()
-        .setCustomId(`help_next_${page}`)
-        .setLabel('Next ▶')
-        .setStyle(ButtonStyle.Secondary)
-        .setDisabled(page === categoryKeys.length - 1);
+    return embed;
+}
 
-    const homeButton = new ButtonBuilder()
-        .setCustomId('help_home_0')
-        .setLabel('🏠 Home')
-        .setStyle(ButtonStyle.Primary);
+function buildMainMenuComponents() {
+    const buttons = categoryKeys.map(key => {
+        const cat = helpCategories[key];
+        return new ButtonBuilder()
+            .setCustomId(`help_cat_${key}`)
+            .setLabel(cat.name)
+            .setEmoji(cat.emoji)
+            .setStyle(ButtonStyle.Primary);
+    });
 
-    const row1 = new ActionRowBuilder().addComponents(selectMenu);
-    const row2 = new ActionRowBuilder().addComponents(prevButton, homeButton, nextButton);
+    // Split buttons into rows of 5 (Discord limit)
+    const row1 = new ActionRowBuilder().addComponents(buttons.slice(0, 5));
+    const rows = [row1];
+    
+    if (buttons.length > 5) {
+        rows.push(new ActionRowBuilder().addComponents(buttons.slice(5, 10)));
+    }
 
-    return [row1, row2];
+    return rows;
+}
+
+function buildCategoryComponents(currentCategory) {
+    const buttons = categoryKeys.map(key => {
+        const cat = helpCategories[key];
+        return new ButtonBuilder()
+            .setCustomId(`help_cat_${key}`)
+            .setLabel(cat.name)
+            .setEmoji(cat.emoji)
+            .setStyle(key === currentCategory ? ButtonStyle.Success : ButtonStyle.Secondary);
+    });
+
+    const backButton = new ButtonBuilder()
+        .setCustomId('help_main')
+        .setEmoji('🏠')
+        .setLabel('Back to Menu')
+        .setStyle(ButtonStyle.Danger);
+
+    const row1 = new ActionRowBuilder().addComponents(buttons.slice(0, 5));
+    const rows = [row1];
+    
+    if (buttons.length > 5) {
+        rows.push(new ActionRowBuilder().addComponents(buttons.slice(5, 10)));
+    }
+    
+    rows.push(new ActionRowBuilder().addComponents(backButton));
+
+    return rows;
 }
 
 async function execute(interaction, client) {
-    const page = 0;
-    
-    const embed = buildHelpEmbed(page);
-    const components = buildComponents(page);
+    const embed = buildMainMenuEmbed();
+    const components = buildMainMenuComponents();
 
     await interaction.reply({ embeds: [embed], components: components, flags: 64 });
 }
@@ -145,46 +176,27 @@ module.exports = {
         .setDescription('Display help information about commands'),
     execute,
     
-    // Handle button and select menu interactions
+    // Handle button interactions
     handleComponent: async (interaction, client) => {
         const customId = interaction.customId;
         
-        if (customId.startsWith('help_category_select')) {
-            // Dropdown menu was used
-            const category = interaction.values[0];
-            const page = categoryKeys.indexOf(category);
-            
-            const embed = buildHelpEmbed(page, category);
-            const components = buildComponents(page, category);
+        if (customId === 'help_main') {
+            // Return to main menu
+            const embed = buildMainMenuEmbed();
+            const components = buildMainMenuComponents();
             
             await interaction.update({ embeds: [embed], components: components });
-        } 
-        else if (customId.startsWith('help_prev_')) {
-            // Previous button
-            const currentPage = parseInt(customId.replace('help_prev_', ''));
-            const newPage = Math.max(0, currentPage - 1);
+        }
+        else if (customId.startsWith('help_cat_')) {
+            // Show specific category
+            const category = customId.replace('help_cat_', '');
             
-            const embed = buildHelpEmbed(newPage);
-            const components = buildComponents(newPage);
-            
-            await interaction.update({ embeds: [embed], components: components });
-        } 
-        else if (customId.startsWith('help_next_')) {
-            // Next button
-            const currentPage = parseInt(customId.replace('help_next_', ''));
-            const newPage = Math.min(categoryKeys.length - 1, currentPage + 1);
-            
-            const embed = buildHelpEmbed(newPage);
-            const components = buildComponents(newPage);
-            
-            await interaction.update({ embeds: [embed], components: components });
-        } 
-        else if (customId.startsWith('help_home_')) {
-            // Home button
-            const embed = buildHelpEmbed(0);
-            const components = buildComponents(0);
-            
-            await interaction.update({ embeds: [embed], components: components });
+            if (helpCategories[category]) {
+                const embed = buildCategoryEmbed(category);
+                const components = buildCategoryComponents(category);
+                
+                await interaction.update({ embeds: [embed], components: components });
+            }
         }
     }
 };
