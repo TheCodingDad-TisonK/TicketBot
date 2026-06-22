@@ -323,6 +323,67 @@ async function handleButton(interaction, client) {
     }
   }
 
+  // ── DM-ticket log buttons (Claim & Reply / Close) ──
+  // These live on the notification posted to the staff log channel for
+  // private DM tickets (e.g. staff reports). Staff-only.
+  if (ns === 'dmticket') {
+    if (!isMod(interaction.member, interaction.guildId)) {
+      return interaction.reply({ embeds: [errorEmbed('Staff only.')], ephemeral: true });
+    }
+
+    const ticket = Tickets.getById.get(ticketId);
+    if (!ticket) return interaction.reply({ embeds: [errorEmbed('Ticket not found.')], ephemeral: true });
+    if (ticket.status !== 'open') {
+      return interaction.reply({ embeds: [errorEmbed('This ticket is already closed.')], ephemeral: true });
+    }
+
+    if (action === 'claim') {
+      if (ticket.claimed_by && ticket.claimed_by !== interaction.user.id) {
+        return interaction.reply({ embeds: [errorEmbed(`Already claimed by <@${ticket.claimed_by}>.`)], ephemeral: true });
+      }
+
+      Tickets.updateClaimed.run(interaction.user.id, ticket.id);
+      StaffStats.upsert.run({ userId: interaction.user.id, guildId: interaction.guildId, now: Date.now() });
+      StaffStats.incrementClaimed.run(Date.now(), interaction.user.id, interaction.guildId);
+
+      // Mark the log message as claimed (disable claim, keep close)
+      const claimedRow = new ActionRowBuilder().addComponents(
+        new ButtonBuilder().setCustomId(`dmticket:claim:${ticket.id}`).setLabel(`Claimed by ${interaction.user.username}`).setEmoji('✋').setStyle(ButtonStyle.Secondary).setDisabled(true),
+        new ButtonBuilder().setCustomId(`dmticket:close:${ticket.id}`).setLabel('Close').setEmoji('🔒').setStyle(ButtonStyle.Danger),
+      );
+      await interaction.update({ components: [claimedRow] });
+
+      // Tell the claimer how to actually reply (DM relay, not a slash command)
+      await interaction.followUp({
+        embeds: [infoEmbed(
+          'Ticket Claimed',
+          `You claimed \`${ticket.id}\` from <@${ticket.user_id}>.\n\n` +
+          `To reply, **DM this bot** with the ticket ID followed by your message:\n` +
+          `\`\`\`\n${ticket.id} your message here\n\`\`\`\n` +
+          `Your reply is relayed privately to the user.`,
+        )],
+        ephemeral: true,
+      });
+
+      await logAction(client, interaction.guildId, logEmbed('claim', ticket, interaction.user.id));
+      return;
+    }
+
+    if (action === 'close') {
+      // Reuse the standard close-reason modal; its submit handler already
+      // skips channel archiving for dm_mode tickets and DMs the user.
+      const modal = new ModalBuilder()
+        .setCustomId(`ticket:close_reason_modal:${ticket.id}`)
+        .setTitle('Close DM Ticket')
+        .addComponents(new ActionRowBuilder().addComponents(
+          new TextInputBuilder().setCustomId('reason').setLabel('Reason for closing')
+            .setStyle(TextInputStyle.Short).setMaxLength(200).setRequired(false)
+            .setPlaceholder('Optional reason…'),
+        ));
+      return interaction.showModal(modal);
+    }
+  }
+
   // ── Mod panel buttons ─────────────────────────
   if (ns === 'modpanel') {
     if (!isMod(interaction.member, interaction.guildId)) {
@@ -463,7 +524,7 @@ async function handleDMTicket(ticket, user, description, client, interaction) {
               { name: '📝 Subject', value: ticket.subject || 'N/A', inline: false },
               { name: '💬 Initial Message', value: description.slice(0, 500), inline: false },
             )
-            .setFooter({ text: 'DM ticket — reply via /dm-reply command' });
+            .setFooter({ text: `DM ticket — claim below, then DM this bot: ${ticket.id} <message>` });
 
           const row = new ActionRowBuilder().addComponents(
             new ButtonBuilder().setCustomId(`dmticket:claim:${ticket.id}`).setLabel('Claim & Reply').setEmoji('✋').setStyle(ButtonStyle.Primary),
