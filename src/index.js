@@ -51,18 +51,77 @@ client.once('ready', () => {
   console.log(`   Commands: ${commands.size}`);
   console.log(`   Guilds  : ${client.guilds.cache.size}\n`);
 
-  client.user.setActivity('all the tickets 🎫', { type: ActivityType.Watching });
+  const database = require('./utils/database');
 
-  // Notify server owners/admins to configure the bot
+  // ── Helper Functions ────────────────────────
+
+  const getTotalMembers = () =>
+    client.guilds.cache.reduce((acc, g) => acc + (g.memberCount || 0), 0);
+
+  const getOpenTickets = () => {
+    try {
+      return database.Tickets.countAllOpen.get().count || 0;
+    } catch {
+      return 0;
+    }
+  };
+
+  const getUptime = () => {
+    const totalSeconds = Math.floor(process.uptime());
+    const hours = Math.floor(totalSeconds / 3600);
+    const minutes = Math.floor((totalSeconds % 3600) / 60);
+    return `${hours}h ${minutes}m`;
+  };
+
+  // ── Rotating Status System ──────────────────
+
+  const statuses = [
+    () => ({
+      name: `/help | ${client.guilds.cache.size} servers`,
+      type: ActivityType.Playing,
+    }),
+    () => ({
+      name: `${getTotalMembers().toLocaleString()} members`,
+      type: ActivityType.Watching,
+    }),
+    () => ({
+      name: `${getOpenTickets()} open tickets`,
+      type: ActivityType.Watching,
+    }),
+    () => ({
+      name: `Uptime: ${getUptime()}`,
+      type: ActivityType.Playing,
+    }),
+    () => ({
+      name: `Use /help for commands`,
+      type: ActivityType.Listening,
+    }),
+  ];
+
+  let index = 0;
+
+  const rotateStatus = () => {
+    const status = statuses[index]();
+    client.user.setActivity(status.name, { type: status.type });
+    index = (index + 1) % statuses.length;
+  };
+
+  rotateStatus();                 // Set immediately
+  setInterval(rotateStatus, 15000); // Rotate every 15s
+
+  // ── Setup Check ─────────────────────────────
+
   for (const [guildId, guild] of client.guilds.cache) {
-    const settings = require('./utils/database').Settings.get.get(guildId);
+    const settings = database.Settings.get.get(guildId);
     if (!settings || !settings.ticket_category) {
-      // Bot hasn't been configured yet - notify the owner
       const owner = guild.members.cache.get(guild.ownerId);
-      if (owner && owner.user) {
+      if (owner?.user) {
         owner.user.send({
-          content: `👋 Hi! I've been added to **${guild.name}**.\n\nTo get started, please run \`/settings set\` to configure the ticket categories and roles.\n\nUse \`/panel\` to post the ticket panel in a channel.`
-        }).catch(() => {}); // Silently fail if DM is blocked
+          content:
+            `👋 Hi! I've been added to **${guild.name}**.\n\n` +
+            `To get started, run \`/settings set\` to configure ticket categories and roles.\n\n` +
+            `Then use \`/panel\` to post the ticket panel.`,
+        }).catch(() => {});
       }
       console.log(`[Setup] ${guild.name} needs configuration`);
     }
